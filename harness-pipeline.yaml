@@ -1,0 +1,60 @@
+pipeline:
+  name: local-docker-ci-cd-poc
+  identifier: local_docker_ci_cd_poc
+  projectIdentifier: default_project
+  orgIdentifier: default
+  stages:
+    - stage:
+        name: Build_and_Deploy
+        identifier: Build_and_Deploy
+        type: CI
+        spec:
+          cloneCodebase: true
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: account.harnessImage
+              namespace: harness-delegate-ng
+              os: Linux
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: Docker Build
+                  identifier: docker_build
+                  spec:
+                    shell: Bash
+                    command: |
+                      docker build -t local-poc-app:${HARNESS_GIT_COMMIT_SHA} .
+
+              - step:
+                  type: Run
+                  name: Stop Existing Container
+                  identifier: stop_container
+                  spec:
+                    shell: Bash
+                    command: |
+                      docker rm -f local-poc-app || true
+
+              - step:
+                  type: Run
+                  name: Run Container
+                  identifier: run_container
+                  spec:
+                    shell: Bash
+                    command: |
+                      docker run -d \
+                        --name local-poc-app \
+                        -p 8080:8080 \
+                        local-poc-app:${HARNESS_GIT_COMMIT_SHA}
+
+              - step:
+                  type: Run
+                  name: Health Check
+                  identifier: health_check
+                  spec:
+                    shell: Bash
+                    command: |
+                      sleep 5
+                      curl -f http://localhost:8080/health
+
