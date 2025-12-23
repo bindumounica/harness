@@ -1,8 +1,8 @@
-name: CI - Docker Build & Health Check
+name: CI - Build, Test & Push Docker Image
+
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
 
 jobs:
@@ -10,34 +10,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Build Docker image
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Build Docker image
         run: |
-          docker build -t local-poc-app:${{ github.sha }} .
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/local-poc-app:${{ github.sha }} .
 
-      # 3️⃣ Run container
       - name: Run container
         run: |
           docker run -d \
             --name local-poc-app \
             -p 8080:8080 \
-            local-poc-app:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/local-poc-app:${{ github.sha }}
 
-      # 4️⃣ Wait for app to start
       - name: Wait for app
         run: sleep 5
 
-      # 5️⃣ Health check
       - name: Health check
         run: |
           curl -f http://localhost:8080/health
 
-      # 6️⃣ Cleanup
-      - name: Cleanup container
+      - name: Push image to Docker Hub
+        run: |
+          docker push bindumounica87/local-poc-app:${{ github.sha }}
+
+      - name: Cleanup
         if: always()
         run: |
           docker rm -f local-poc-app || true
