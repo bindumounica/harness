@@ -1,18 +1,9 @@
-const http = require("http");
-
-const PORT = 8080;
-
-const server = http.createServer((req, res) => {
-  if (req.url === "/health") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "OK" }));
-  } else {
-    res.writeHead(404);
-    res.end();
+{
+  "name": "local-ci-cd-poc",
+  "version": "1.0.0",
+  "private": true,
+  "main": "app/server.js",
+  "scripts": {
+    "start": "node app/server.js"
   }
-});
-
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
+}
