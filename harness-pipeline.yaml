@@ -1,60 +1,112 @@
 pipeline:
-  name: local-docker-ci-cd-poc
-  identifier: local_docker_ci_cd_poc
+  name: node-docker-cd-poc
+  identifier: node_docker_cd_poc
   projectIdentifier: default_project
   orgIdentifier: default
+
   stages:
     - stage:
-        name: Build_and_Deploy
-        identifier: Build_and_Deploy
-        type: CI
+        name: Deploy_to_VM
+        identifier: deploy_to_vm
+        type: Deployment
+
         spec:
-          cloneCodebase: true
-          infrastructure:
-            type: KubernetesDirect
-            spec:
-              connectorRef: account.harnessImage
-              namespace: harness-delegate-ng
-              os: Linux
+          service:
+            serviceRef: node_docker_app
+            serviceInputs:
+              serviceDefinition:
+                type: Generic
+                spec:
+                  artifacts:
+                    primary:
+                      type: DockerRegistry
+                      spec:
+                        connectorRef: dockerhub
+                        imagePath: <your-dockerhub-username>/local-poc-app
+                        tag: <+input>
+
+          environment:
+            environmentRef: dev
+            infrastructureDefinitions:
+              - identifier: docker_vm
+                type: SshWinRm
+                spec:
+                  connectorRef: vm_ssh
+
           execution:
             steps:
               - step:
-                  type: Run
-                  name: Docker Build
-                  identifier: docker_build
+                  name: Pull Docker Image
+                  identifier: pull_image
+                  type: ShellScript
                   spec:
                     shell: Bash
-                    command: |
-                      docker build -t local-poc-app:${HARNESS_GIT_COMMIT_SHA} .
+                    onDelegate: false
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          echo "Pulling image <+artifacts.primary.image>"
+                          docker pull <+artifacts.primary.image>
 
               - step:
-                  type: Run
                   name: Stop Existing Container
                   identifier: stop_container
+                  type: ShellScript
                   spec:
                     shell: Bash
-                    command: |
-                      docker rm -f local-poc-app || true
+                    onDelegate: false
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          docker rm -f local-poc-app || true
 
               - step:
-                  type: Run
-                  name: Run Container
+                  name: Run New Container
                   identifier: run_container
+                  type: ShellScript
                   spec:
                     shell: Bash
-                    command: |
-                      docker run -d \
-                        --name local-poc-app \
-                        -p 8080:8080 \
-                        local-poc-app:${HARNESS_GIT_COMMIT_SHA}
+                    onDelegate: false
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          docker run -d \
+                            --name local-poc-app \
+                            -p 8080:8080 \
+                            <+artifacts.primary.image>
 
               - step:
-                  type: Run
                   name: Health Check
                   identifier: health_check
+                  type: ShellScript
                   spec:
                     shell: Bash
-                    command: |
-                      sleep 5
-                      curl -f http://localhost:8080/health
+                    onDelegate: false
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          sleep 5
+                          curl -f http://localhost:8080/health
 
+          rollbackSteps:
+            - step:
+                name: Rollback Container
+                identifier: rollback_container
+                type: ShellScript
+                spec:
+                  shell: Bash
+                  onDelegate: false
+                  source:
+                    type: Inline
+                    spec:
+                      script: |
+                        echo "Rolling back deployment"
+                        docker rm -f local-poc-app || true
+                        docker run -d \
+                          --name local-poc-app \
+                          -p 8080:8080 \
+                          <+rollbackArtifact.image>
