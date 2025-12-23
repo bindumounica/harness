@@ -1,0 +1,44 @@
+name: CI - Docker Build & Health Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2️⃣ Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t local-poc-app:${{ github.sha }} .
+
+      # 3️⃣ Run container
+      - name: Run container
+        run: |
+          docker run -d \
+            --name local-poc-app \
+            -p 8080:8080 \
+            local-poc-app:${{ github.sha }}
+
+      # 4️⃣ Wait for app to start
+      - name: Wait for app
+        run: sleep 5
+
+      # 5️⃣ Health check
+      - name: Health check
+        run: |
+          curl -f http://localhost:8080/health
+
+      # 6️⃣ Cleanup
+      - name: Cleanup container
+        if: always()
+        run: |
+          docker rm -f local-poc-app || true
