@@ -1,5 +1,4 @@
 name: CI - Build, Test & Push Docker Image
-
 on:
   push:
     branches: [ main ]
