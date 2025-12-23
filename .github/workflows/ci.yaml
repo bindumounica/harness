@@ -1,5 +1,4 @@
 name: CI - Docker Build & Health Check
-
 on:
   push:
     branches:
